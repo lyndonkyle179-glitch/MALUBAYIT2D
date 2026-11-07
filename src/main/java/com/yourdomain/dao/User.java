@@ -1,4 +1,11 @@
-package com.yourdomain.dao;
 
-public class User {
+package com.yourdomain.model;
+
+public record User(
+        int id,
+        String username,
+        String password,
+        String roles,
+        String status
+) {
 }
