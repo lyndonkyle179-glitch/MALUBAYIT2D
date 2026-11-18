@@ -1,4 +1,3 @@
-
 package com.yourdomain.model;
 
 public record User(

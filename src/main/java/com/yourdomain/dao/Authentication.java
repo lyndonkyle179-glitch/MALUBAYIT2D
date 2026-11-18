@@ -1,6 +1,6 @@
-
 package com.yourdomain.ui;
 
+import com.yourdomain.dao.ActivityLogDao;
 import com.yourdomain.dao.DatabaseConnection;
 import com.yourdomain.dao.UserDao;
 import com.yourdomain.model.User;
@@ -9,24 +9,22 @@ import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
-import java.util.List;
 import java.util.Optional;
 import java.util.Scanner;
-import java.util.Set;
 
 public class Authentication {
 
-    private static final Set<String> VALID_ROLES =
-            Set.of("STUDENT", "TEACHER", "LIBRARIAN", "ADMIN");
-
-    private static final Set<String> VALID_STATUSES =
-            Set.of("APPROVED", "PENDING");
-
     private final UserDao userDao;
+    private final ActivityLogDao activityLogDao;
     private final Scanner scanner;
 
-    public Authentication(UserDao userDao, Scanner scanner) {
+    public Authentication(
+            UserDao userDao,
+            ActivityLogDao activityLogDao,
+            Scanner scanner
+    ) {
         this.userDao = userDao;
+        this.activityLogDao = activityLogDao;
         this.scanner = scanner;
     }
 
@@ -43,7 +41,7 @@ public class Authentication {
             System.out.println("2. Login");
             System.out.println("0. Exit");
 
-            int choice = readIntInput("Choose: ");
+            int choice = Prompts.readInt(scanner, "Choose: ");
 
             switch (choice) {
 
@@ -60,92 +58,6 @@ public class Authentication {
         }
 
         System.out.println("Application closed.");
-    }
-
-    // ==================== INPUT VALIDATION ====================
-
-    private int readIntInput(String prompt) {
-
-        while (true) {
-
-            System.out.print(prompt);
-
-            String input = scanner.nextLine().trim();
-
-            try {
-                return Integer.parseInt(input);
-
-            } catch (NumberFormatException e) {
-
-                System.out.println(
-                        "Invalid input. Please enter numbers only (or 0 to cancel)."
-                );
-            }
-        }
-    }
-
-    // ==================== VALID ROLE ====================
-
-    private String readValidRole() {
-
-        while (true) {
-
-            System.out.println("\nAvailable roles:");
-            System.out.println("STUDENT");
-            System.out.println("TEACHER");
-            System.out.println("LIBRARIAN");
-            System.out.println("ADMIN");
-            System.out.println("Enter 0 to cancel.");
-
-            System.out.print("Enter new role: ");
-
-            String role = scanner.nextLine()
-                    .trim()
-                    .toUpperCase();
-
-            if (role.equals("0")) {
-                return null;
-            }
-
-            if (VALID_ROLES.contains(role)) {
-                return role;
-            }
-
-            System.out.println(
-                    "Invalid role. Please enter STUDENT, TEACHER, LIBRARIAN, or ADMIN."
-            );
-        }
-    }
-
-    // ==================== VALID STATUS ====================
-
-    private String readValidStatus() {
-
-        while (true) {
-
-            System.out.println("\nAvailable statuses:");
-            System.out.println("APPROVED");
-            System.out.println("PENDING");
-            System.out.println("Enter 0 to cancel.");
-
-            System.out.print("Enter new status: ");
-
-            String status = scanner.nextLine()
-                    .trim()
-                    .toUpperCase();
-
-            if (status.equals("0")) {
-                return null;
-            }
-
-            if (VALID_STATUSES.contains(status)) {
-                return status;
-            }
-
-            System.out.println(
-                    "Invalid status. Please enter APPROVED or PENDING."
-            );
-        }
     }
 
     // ==================== REGISTRATION ====================
@@ -178,7 +90,7 @@ public class Authentication {
                 return;
             }
 
-            String role = readValidRole();
+            String role = Prompts.readRole(scanner);
 
             if (role == null) {
                 System.out.println("Registration cancelled.");
@@ -254,7 +166,7 @@ public class Authentication {
                 return;
             }
 
-            userDao.logActivity(user.id(), "LOGIN");
+            activityLogDao.log(user.id(), "LOGIN");
 
             System.out.println("Login successful!");
 
@@ -281,207 +193,16 @@ public class Authentication {
 
     private void adminMenu(User currentAdmin) {
 
-        boolean running = true;
+        AdminMenu adminMenu = new AdminMenu(
+                userDao,
+                activityLogDao,
+                scanner,
+                this::viewAllBooks
+        );
 
-        while (running) {
-
-            System.out.println("\n===== ADMIN MENU =====");
-            System.out.println("Welcome, " + currentAdmin.username());
-            System.out.println("1. View All Users");
-            System.out.println("2. Update User Role and Status");
-            System.out.println("3. View All Books");
-            System.out.println("0. Logout");
-
-            int choice = readIntInput("Choose: ");
-
-            switch (choice) {
-
-                case 1 -> viewUsers();
-
-                case 2 -> updateUserRoleAndStatus(currentAdmin);
-
-                case 3 -> viewAllBooks();
-
-                case 0 -> running = false;
-
-                default -> System.out.println("Invalid choice.");
-            }
-        }
+        adminMenu.start(currentAdmin);
 
         logOut(currentAdmin);
-    }
-
-    // ==================== VIEW USERS ====================
-
-    private void viewUsers() {
-
-        try {
-
-            List<User> users = userDao.getAllUsers();
-
-            System.out.println(
-                    "\n================ REGISTERED USERS ================"
-            );
-
-            System.out.printf(
-                    "%-5s | %-20s | %-12s | %-12s%n",
-                    "ID", "USERNAME", "ROLE", "STATUS"
-            );
-
-            System.out.println(
-                    "---------------------------------------------------"
-            );
-
-            if (users.isEmpty()) {
-
-                System.out.println("No registered users found.");
-                return;
-            }
-
-            for (User user : users) {
-
-                System.out.printf(
-                        "%-5d | %-20s | %-12s | %-12s%n",
-                        user.id(),
-                        user.username(),
-                        user.roles(),
-                        user.status()
-                );
-            }
-
-        } catch (SQLException e) {
-
-            System.out.println(
-                    "Unable to load users: " + e.getMessage()
-            );
-        }
-    }
-
-    // ==================== UPDATE USER ROLE AND STATUS ====================
-
-    private void updateUserRoleAndStatus(User currentAdmin) {
-
-        try {
-
-            System.out.println(
-                    "\n===== UPDATE USER ROLE AND STATUS ====="
-            );
-
-            // Display all registered users.
-            viewUsers();
-
-            // Ask for target ID.
-            int targetUserId = readIntInput(
-                    "\nEnter target User ID (0 to cancel): "
-            );
-
-            // Cancel option.
-            if (targetUserId == 0) {
-
-                System.out.println("Update cancelled.");
-                return;
-            }
-
-            if (targetUserId < 0) {
-
-                System.out.println(
-                        "User ID must be greater than zero."
-                );
-
-                return;
-            }
-
-            // SELF-EDIT SECURITY RESTRICTION.
-            if (targetUserId == currentAdmin.id()) {
-
-                System.out.println(
-                        "\nWARNING: Modifying the currently active admin account is restricted."
-                );
-
-                return;
-            }
-
-            // Check whether user exists.
-            if (!userExists(targetUserId)) {
-
-                System.out.println(
-                        "User ID not found. Update cancelled."
-                );
-
-                return;
-            }
-
-            // Ask for new role.
-            String newRole = readValidRole();
-
-            if (newRole == null) {
-
-                System.out.println("Update cancelled.");
-                return;
-            }
-
-            // Ask for new status.
-            String newStatus = readValidStatus();
-
-            if (newStatus == null) {
-
-                System.out.println("Update cancelled.");
-                return;
-            }
-
-            // Update database.
-            boolean updated =
-                    userDao.updateUserRoleAndStatus(
-                            targetUserId,
-                            newRole.toUpperCase(),
-                            newStatus.toUpperCase()
-                    );
-
-            if (updated) {
-
-                System.out.println(
-                        "\nUser role and status updated successfully!"
-                );
-
-                System.out.println("User ID: " + targetUserId);
-                System.out.println("New Role: " + newRole);
-                System.out.println("New Status: " + newStatus);
-
-            } else {
-
-                System.out.println(
-                        "Update failed. User ID was not found."
-                );
-            }
-
-        } catch (SQLException | IllegalArgumentException e) {
-
-            System.out.println(
-                    "Unable to update user: " + e.getMessage()
-            );
-        }
-    }
-
-    // ==================== CHECK USER ID ====================
-
-    private boolean userExists(int userId)
-            throws SQLException {
-
-        String sql = "SELECT 1 FROM users WHERE id = ?";
-
-        try (Connection connection =
-                     DatabaseConnection.getConnection();
-
-             PreparedStatement statement =
-                     connection.prepareStatement(sql)) {
-
-            statement.setInt(1, userId);
-
-            try (ResultSet result = statement.executeQuery()) {
-
-                return result.next();
-            }
-        }
     }
 
     // ==================== LIBRARIAN MENU ====================
@@ -499,7 +220,7 @@ public class Authentication {
             System.out.println("3. View Borrowing Records");
             System.out.println("0. Logout");
 
-            int choice = readIntInput("Choose: ");
+            int choice = Prompts.readInt(scanner, "Choose: ");
 
             switch (choice) {
 
@@ -537,7 +258,9 @@ public class Authentication {
             System.out.println("0. Logout");
             System.out.println("--------------------------------");
 
-            int choice = readIntInput("Choose an option: ");
+            int choice = Prompts.readInt(
+                    scanner, "Choose an option: "
+            );
 
             switch (choice) {
 
@@ -566,7 +289,7 @@ public class Authentication {
 
         try {
 
-            userDao.logActivity(user.id(), "LOGOUT");
+            activityLogDao.log(user.id(), "LOGOUT");
 
         } catch (SQLException e) {
 
@@ -749,7 +472,8 @@ public class Authentication {
 
         viewAvailableBooks();
 
-        int bookId = readIntInput(
+        int bookId = Prompts.readInt(
+                scanner,
                 "\nEnter Book ID to borrow (0 to cancel): "
         );
 
@@ -819,7 +543,7 @@ public class Authentication {
                         "Book borrowed successfully!"
                 );
 
-                userDao.logActivity(
+                activityLogDao.log(
                         user.id(), "BORROW_BOOK"
                 );
 
@@ -852,7 +576,8 @@ public class Authentication {
 
         viewMyBorrowedBooks(user);
 
-        int recordId = readIntInput(
+        int recordId = Prompts.readInt(
+                scanner,
                 "\nEnter Borrow Record ID to return (0 to cancel): "
         );
 
@@ -949,7 +674,7 @@ public class Authentication {
                         "Book returned successfully!"
                 );
 
-                userDao.logActivity(
+                activityLogDao.log(
                         user.id(), "RETURN_BOOK"
                 );
 

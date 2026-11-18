@@ -1,4 +1,3 @@
-
 package com.yourdomain.dao;
 
 import java.sql.Connection;
@@ -64,6 +63,11 @@ public class DatabaseInitializer {
                 for (String sql : tables) {
                     statement.execute(sql);
                 }
+
+                statement.execute("""
+                        CREATE INDEX IF NOT EXISTS idx_activity_logs_user
+                        ON activity_logs(user_id, id DESC)
+                        """);
             }
 
             System.out.println("Database initialized successfully!");

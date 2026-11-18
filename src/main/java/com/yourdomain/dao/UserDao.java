@@ -1,4 +1,3 @@
-
 package com.yourdomain.dao;
 
 import com.yourdomain.model.User;
@@ -155,30 +154,6 @@ public class UserDao {
             statement.setInt(2, userId);
 
             return statement.executeUpdate() > 0;
-        }
-    }
-
-    // ACTIVITY LOG
-
-    public void logActivity(Integer userId, String action)
-            throws SQLException {
-
-        String sql = """
-                INSERT INTO activity_logs(user_id, action)
-                VALUES (?, ?)
-                """;
-
-        try (Connection connection = DatabaseConnection.getConnection();
-             PreparedStatement statement = connection.prepareStatement(sql)) {
-
-            if (userId == null) {
-                statement.setNull(1, Types.INTEGER);
-            } else {
-                statement.setInt(1, userId);
-            }
-
-            statement.setString(2, action);
-            statement.executeUpdate();
         }
     }
 

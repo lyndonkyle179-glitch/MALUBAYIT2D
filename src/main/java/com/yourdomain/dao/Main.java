@@ -1,6 +1,6 @@
-
 package com.yourdomain;
 
+import com.yourdomain.dao.ActivityLogDao;
 import com.yourdomain.dao.DatabaseInitializer;
 import com.yourdomain.dao.UserDao;
 import com.yourdomain.ui.Authentication;
@@ -17,12 +17,15 @@ public class Main {
 
         // Step 2: Create shared objects.
         UserDao userDao = new UserDao();
+        ActivityLogDao activityLogDao = new ActivityLogDao();
 
         // Step 3: Delegate to Authentication.
         try (Scanner scanner = new Scanner(System.in)) {
 
             Authentication authentication =
-                    new Authentication(userDao, scanner);
+                    new Authentication(
+                            userDao, activityLogDao, scanner
+                    );
 
             authentication.start();
         }
